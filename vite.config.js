@@ -173,61 +173,70 @@ const generateExtraFiles = () => ({
 });
 
 // https://vitejs.dev/config/
-export default defineConfig({
-  resolve: {
-    alias: {
-      $lib: path.resolve('./src/lib/'),
-    },
-    extensions: ['.js', '.svelte'],
-  },
-  build: {
-    reportCompressedSize: false,
-    chunkSizeWarningLimit: 5000,
-    sourcemap: true,
-    rolldownOptions: {
-      // Output JavaScript only
-      input: 'src/lib/main.js',
-      output: [
-        {
-          entryFileNames: 'sveltia-cms.js',
-          format: 'iife',
-          comments: {
-            legal: true,
-          },
-        },
-        {
-          entryFileNames: 'sveltia-cms.mjs',
-          format: 'es',
-          comments: {
-            legal: true,
-          },
-        },
-      ],
-      // Keep exports in the ES module
-      // https://stackoverflow.com/q/71500190
-      preserveEntrySignatures: 'strict',
-      // Silence some warnings that are not relevant to our use case
-      checks: {
-        missingNameOptionForIifeExport: false,
-        mixedExports: false,
-        pluginTimings: false,
+export default defineConfig(({ mode }) => {
+  const siteBuild = mode === 'site';
+
+  return {
+    resolve: {
+      alias: {
+        $lib: path.resolve('./src/lib/'),
       },
+      extensions: ['.js', '.svelte'],
     },
-    outDir: 'package/dist',
-  },
-  plugins: [
-    svelte({
-      ...svelteConfig,
-      emitCss: false,
-    }),
-    copyPackageFiles(),
-    generateExtraFiles(),
-  ],
-  test: {
-    coverage: {
-      include: ['src/lib/{components,services}/**/*.js'],
-      reporter: ['text', 'json-summary', 'json'],
+    build: siteBuild
+      ? {
+          outDir: 'dist',
+          reportCompressedSize: false,
+          sourcemap: true,
+        }
+      : {
+          reportCompressedSize: false,
+          chunkSizeWarningLimit: 5000,
+          sourcemap: true,
+          rolldownOptions: {
+            // Output JavaScript only
+            input: 'src/lib/main.js',
+            output: [
+              {
+                entryFileNames: 'sveltia-cms.js',
+                format: 'iife',
+                comments: {
+                  legal: true,
+                },
+              },
+              {
+                entryFileNames: 'sveltia-cms.mjs',
+                format: 'es',
+                comments: {
+                  legal: true,
+                },
+              },
+            ],
+            // Keep exports in the ES module
+            // https://stackoverflow.com/q/71500190
+            preserveEntrySignatures: 'strict',
+            // Silence some warnings that are not relevant to our use case
+            checks: {
+              missingNameOptionForIifeExport: false,
+              mixedExports: false,
+              pluginTimings: false,
+            },
+          },
+          outDir: 'package/dist',
+        },
+    plugins: [
+      svelte({
+        ...svelteConfig,
+        emitCss: siteBuild,
+      }),
+      ...(siteBuild ? [] : [copyPackageFiles(), generateExtraFiles()]),
+    ],
+    test: {
+      coverage: {
+        include: ['src/lib/{components,services}/**/*.js'],
+        reporter: ['text', 'json-summary', 'json'],
+      },
+      silent: true,
     },
-    silent: true,
-  },
+  };
 });
