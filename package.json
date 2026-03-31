@@ -14,6 +14,7 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
+    "build:site": "vite build --mode site",
     "build:watch": "vite build --watch",
     "check": "pnpm run '/^check:.*/'",
     "check:audit": "pnpm audit",
@@ -26,12 +27,13 @@
     "check:svelte": "svelte-check",
     "dev": "vite",
     "format": "prettier --write .",
+    "postinstall": "node scripts/postinstall.js",
     "prepublishOnly": "vite build",
     "preview": "vite preview",
     "test": "NODE_OPTIONS=--no-experimental-webstorage vitest run",
     "test:coverage": "NODE_OPTIONS=--no-experimental-webstorage vitest run --coverage",
     "test:watch": "NODE_OPTIONS=--no-experimental-webstorage vitest",
-    "deploy": "wrangler publish"
+    "deploy": "pnpm run build:site && wrangler deploy"
   },
   "dependencies": {
     "@jsquash/webp": "^1.5.0",
@@ -99,7 +101,8 @@
     "ts-json-schema-generator": "^2.9.0",
     "typescript": "^5.9.3",
     "vite": "^8.0.3",
-    "vitest": "^4.1.2"
+    "vitest": "^4.1.2",
+    "wrangler": "^4.78.0"
   },
   "publishConfig": {
     "directory": "package",
