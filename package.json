@@ -30,7 +30,8 @@
     "preview": "vite preview",
     "test": "NODE_OPTIONS=--no-experimental-webstorage vitest run",
     "test:coverage": "NODE_OPTIONS=--no-experimental-webstorage vitest run --coverage",
-    "test:watch": "NODE_OPTIONS=--no-experimental-webstorage vitest"
+    "test:watch": "NODE_OPTIONS=--no-experimental-webstorage vitest",
+    "deploy": "wrangler publish"
   },
   "dependencies": {
     "@jsquash/webp": "^1.5.0",
