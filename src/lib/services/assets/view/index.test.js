@@ -4,7 +4,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getFolderLabelByCollection, showAssetOverlay, showUploadAssetsDialog } from './index.js';
+import { getFolderLabelByCollection, showAssetOverlay, showUploadAssetsDialog } from '.';
 
 const { _backendAv, _assetListSettingsAv } = vi.hoisted(() => {
   /**
@@ -46,27 +46,15 @@ const { _backendAv, _assetListSettingsAv } = vi.hoisted(() => {
 });
 
 // Mock dependencies
-vi.mock('svelte-i18n', () => ({
-  _: {
-    subscribe: vi.fn((callback) => {
-      /**
-       * Mock translation function for testing.
-       * @param {string} key Translation key to look up.
-       * @returns {string} Translated text or original key if not found.
-       */
-      const mockTranslationFunction = (key) => {
-        /** @type {Record<string, string>} */
-        const translations = {
-          all_assets: 'All Assets',
-          global_assets: 'Global Assets',
-        };
+vi.mock('@sveltia/i18n', () => ({
+  _: (/** @type {string} */ key) => {
+    /** @type {Record<string, string>} */
+    const translations = {
+      all_assets: 'All Assets',
+      global_assets: 'Global Assets',
+    };
 
-        return translations[key] || key;
-      };
-
-      callback(mockTranslationFunction);
-      return vi.fn();
-    }),
+    return translations[key] || key;
   },
 }));
 
@@ -166,7 +154,7 @@ describe('assets/view/index', () => {
         return vi.fn();
       });
 
-      const { showUploadAssetsConfirmDialog } = await import('./index.js');
+      const { showUploadAssetsConfirmDialog } = await import('.');
 
       showUploadAssetsConfirmDialog.subscribe(mockCallback);
 
@@ -368,7 +356,7 @@ describe('assets/view/index', () => {
 
   describe('defaultView', () => {
     it('should have correct default view settings', async () => {
-      const { defaultView } = await import('./index.js');
+      const { defaultView } = await import('.');
 
       expect(defaultView).toEqual({
         type: 'grid',
@@ -383,7 +371,7 @@ describe('assets/view/index', () => {
 
   describe('currentView', () => {
     it('should be defined as a store', async () => {
-      const { currentView } = await import('./index.js');
+      const { currentView } = await import('.');
 
       expect(currentView).toBeDefined();
       expect(typeof currentView.subscribe).toBe('function');
@@ -428,7 +416,7 @@ describe('assets/view/index', () => {
 
       vi.mocked(selectedAssets.set).mockImplementationOnce(() => {});
 
-      const { listedAssets } = await import('./index.js');
+      const { listedAssets } = await import('.');
       const mockAssetCallback = vi.fn();
 
       listedAssets.subscribe(mockAssetCallback);
@@ -462,7 +450,7 @@ describe('assets/view/index', () => {
 
       vi.mocked(selectedAssets.set).mockImplementationOnce(() => {});
 
-      const { listedAssets } = await import('./index.js');
+      const { listedAssets } = await import('.');
       const mockAssetCallback = vi.fn();
 
       listedAssets.subscribe(mockAssetCallback);
@@ -497,7 +485,7 @@ describe('assets/view/index', () => {
 
       vi.mocked(selectedAssets.set).mockImplementationOnce(() => {});
 
-      const { listedAssets } = await import('./index.js');
+      const { listedAssets } = await import('.');
       const mockAssetCallback = vi.fn();
 
       listedAssets.subscribe(mockAssetCallback);
@@ -550,7 +538,7 @@ describe('assets/view/index', () => {
 
       vi.mocked(selectedAssets.set).mockImplementationOnce(() => {});
 
-      const { listedAssets } = await import('./index.js');
+      const { listedAssets } = await import('.');
       const mockAssetCallback = vi.fn();
 
       listedAssets.subscribe(mockAssetCallback);
@@ -595,7 +583,7 @@ describe('assets/view/index', () => {
       mockFilterFn.mockReturnValue(mockAssets);
       mockGroupFn.mockReturnValue(mockGroups);
 
-      const { assetGroups } = await import('./index.js');
+      const { assetGroups } = await import('.');
       const mockCallback = vi.fn();
 
       assetGroups.subscribe(mockCallback);
@@ -655,7 +643,7 @@ describe('assets/view/index', () => {
 
       vi.mocked(selectedAssets.set).mockImplementationOnce(() => {});
 
-      const { assetGroups, currentView } = await import('./index.js');
+      const { assetGroups, currentView } = await import('.');
       const mockCallback = vi.fn();
 
       assetGroups.subscribe(mockCallback);
@@ -685,7 +673,7 @@ describe('assets/view/index', () => {
         return vi.fn();
       });
 
-      await import('./index.js');
+      await import('.');
 
       // Should not have been called for logging when dev mode is disabled
       expect(consoleSpy).not.toHaveBeenCalledWith('listedAssets', expect.any(Array));
@@ -704,7 +692,7 @@ describe('assets/view/index', () => {
         return vi.fn();
       });
 
-      await import('./index.js');
+      await import('.');
 
       expect(consoleSpy).toHaveBeenCalledWith('listedAssets', expect.any(Array));
 

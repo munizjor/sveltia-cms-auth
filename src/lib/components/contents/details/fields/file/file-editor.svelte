@@ -7,9 +7,9 @@
   @see https://sveltiacms.app/en/docs/fields/image
 -->
 <script>
+  import { _ } from '@sveltia/i18n';
   import { AlertDialog, ConfirmationDialog, TextArea } from '@sveltia/ui';
   import { flushSync, getContext } from 'svelte';
-  import { _ } from 'svelte-i18n';
 
   import SelectAssetsDialog from '$lib/components/assets/browser/select-assets-dialog.svelte';
   import DropZone from '$lib/components/assets/shared/drop-zone.svelte';
@@ -68,6 +68,10 @@
   /** @type {DropZone | undefined} */
   let dropZone = $state();
   let processing = $state(false);
+  /** @type {string[]} */
+  let oversizedFileNames = $state([]);
+  /** @type {File[]} */
+  let pendingFiles = $state([]);
 
   const {
     widget: fieldType,
@@ -81,7 +85,8 @@
   const fileName = $derived($entryDraft?.fileName);
   const isIndexFile = $derived($entryDraft?.isIndexFile ?? false);
   const isImageField = $derived(fieldType === 'image');
-  const libraryConfig = $derived(getDefaultMediaLibraryOptions({ fieldConfig }).config);
+  const defaultLibraryOptions = $derived(getDefaultMediaLibraryOptions({ fieldConfig }));
+  const libraryConfig = $derived(defaultLibraryOptions.config);
   const assetLibraryFolderMap = $derived(
     getAssetLibraryFolderMap({ collectionName, fileName, typedKeyPath, isIndexFile }),
   );
@@ -110,12 +115,25 @@
     entry,
   });
   const enabledCloudServiceEntries = $derived(
-    Object.entries(allCloudStorageServices).filter(([, { isEnabled }]) => isEnabled?.() ?? true),
+    Object.entries(allCloudStorageServices).filter(
+      ([, { isEnabled }]) => isEnabled?.(fieldConfig) ?? true,
+    ),
   );
   /**
-   * Disable the drop zone if there are cloud services configured to avoid confusion.
+   * Whether the default (internal) media library is available as a storage provider.
    */
-  const allowDrop = $derived(!enabledCloudServiceEntries.length);
+  const isDefaultLibraryAvailable = $derived(defaultLibraryOptions.enabled && !!targetFolder);
+  /**
+   * The total number of available media storage providers (default and/or cloud).
+   */
+  const totalProviders = $derived(
+    (isDefaultLibraryAvailable ? 1 : 0) + enabledCloudServiceEntries.length,
+  );
+  /**
+   * Disable the drop zone if there are no providers or multiple providers are available, to avoid
+   * confusion about where dropped files will be stored.
+   */
+  const allowDrop = $derived(totalProviders === 1);
 
   /**
    * Reset the current selection.
@@ -138,8 +156,12 @@
       return;
     }
 
+    // Save the current value so we can restore it if all resources fail validation
+    const previousValue = multiple ? undefined : currentValue;
+
     resetSelection();
     processing = true;
+    oversizedFileNames = [];
 
     const resources = await Promise.all(
       selectedResources.map((resource) =>
@@ -149,8 +171,7 @@
 
     /** @type {string[]} */
     const credits = [];
-    /** @type {string[]} */
-    const oversizedFileNames = [];
+    let hasValidResource = false;
 
     const lastIndex = multiple
       ? (Object.keys($entryDraft.currentValues[locale])
@@ -161,6 +182,8 @@
 
     resources.forEach(({ value, credit, oversizedFileName }, index) => {
       if (value) {
+        hasValidResource = true;
+
         if (multiple) {
           const targetIndex = replaceMode ? replaceIndex : lastIndex + 1 + index;
 
@@ -180,6 +203,12 @@
         oversizedFileNames.push(oversizedFileName);
       }
     });
+
+    // Restore the previous value if no valid resources were processed, so that a failed
+    // upload/replace doesn't leave an empty or invalid reference in the YAML
+    if (!hasValidResource && !multiple && previousValue !== undefined) {
+      currentValue = previousValue;
+    }
 
     if (credits.length) {
       photoCredit = credits.join('\n');
@@ -205,7 +234,13 @@
       return;
     }
 
-    onResourcesSelect(files.map((file) => ({ file, folder: targetFolder })));
+    if (isDefaultLibraryAvailable) {
+      onResourcesSelect(files.map((file) => ({ file, folder: targetFolder })));
+    } else {
+      // Open the dialog and pass files to the cloud service panel for upload
+      pendingFiles = files;
+      showSelectAssetsDialog = true;
+    }
   };
 
   /**
@@ -339,23 +374,27 @@
   {entryDraft}
   {fieldConfig}
   {assetLibraryFolderMap}
+  {enabledCloudServiceEntries}
   bind:open={showSelectAssetsDialog}
+  bind:pendingFiles
   onSelect={onResourcesSelect}
 />
 
-<AlertDialog bind:open={showSizeLimitDialog} title={$_('assets_dialog.large_file.title')}>
-  {$_('warning_oversized_file', { values: { size: formatSize(maxSize) } })}
+<AlertDialog bind:open={showSizeLimitDialog} title={_('assets_dialog.large_file.title')}>
+  {_('warning_oversized_files', {
+    values: { count: oversizedFileNames.length, size: formatSize(maxSize) },
+  })}
 </AlertDialog>
 
 <ConfirmationDialog
   bind:open={showPhotoCreditDialog}
-  title={$_('assets_dialog.photo_credit.title')}
-  okLabel={$_('copy')}
+  title={_('assets_dialog.photo_credit.title')}
+  okLabel={_('copy')}
   onOk={() => {
     navigator.clipboard.writeText(photoCredit);
   }}
 >
-  <div role="none">{$_('assets_dialog.photo_credit.description')}</div>
+  <div role="none">{_('assets_dialog.photo_credit.description')}</div>
   <div role="none">
     <TextArea
       flex

@@ -9,13 +9,18 @@
 <script>
   // cSpell:ignore Nominatim jsonv2
 
+  import { _ } from '@sveltia/i18n';
   import { AlertDialog, Button, Icon, Listbox, Option, SearchBar } from '@sveltia/ui';
   import { isObject } from '@sveltia/utils/object';
   import { untrack } from 'svelte';
-  import { _ } from 'svelte-i18n';
 
   import LeafletMap from '$lib/components/common/leaflet-map.svelte';
   import { loadModule } from '$lib/services/app/dependencies';
+  import {
+    getGeometryBounds,
+    isValidGeoJSON,
+    roundCoordinates,
+  } from '$lib/services/contents/fields/map/helper';
   import { sendRequest } from '$lib/services/utils/networking';
   import { toFixed } from '$lib/services/utils/number';
 
@@ -52,7 +57,7 @@
     /* eslint-enable prefer-const */
   } = $props();
 
-  const { decimals = 7, type: geometryType = 'Point' } = $derived(fieldConfig);
+  const { decimals = 7, type: geometryType = 'Point', center, zoom } = $derived(fieldConfig);
   const drawMode = $derived(geometryType.toLowerCase());
 
   /** @type {HTMLElement | undefined} */
@@ -117,6 +122,14 @@
     });
 
     draw = _draw;
+
+    // The $effect below will handle fitting the map to an existing valid value. Apply the
+    // configured center/zoom defaults here for the case where there is no valid value. Leaflet uses
+    // `[latitude, longitude]` format for coordinates, while GeoJSON uses `[longitude, latitude]`.
+    // We need to reverse the order of the coordinates when setting the view of the map.
+    if (!currentValue || !isValidGeoJSON(currentValue, geometryType)) {
+      map.setView(center ? [center[1], center[0]] : [0, 0], zoom ?? 2);
+    }
   };
 
   /**
@@ -138,13 +151,7 @@
 
     inputValue = JSON.stringify({
       type: geometryType,
-      coordinates: feature.geometry.coordinates.map((coords) =>
-        Array.isArray(coords)
-          ? coords.map((c) =>
-              Array.isArray(c) ? c.map((cc) => toFixed(cc, decimals)) : toFixed(c, decimals),
-            )
-          : toFixed(coords, decimals),
-      ),
+      coordinates: roundCoordinates(feature.geometry.coordinates, decimals),
     });
 
     // Allow to have only one feature
@@ -152,6 +159,28 @@
       draw.removeFeatures(
         snapshot.filter((f) => f.id !== feature.id).map((f) => /** @type {string} */ (f.id)),
       );
+    }
+  };
+
+  /**
+   * Fit the map view to the given geometry. For a Point, the map is centered on the coordinates at
+   * zoom level 15. For a LineString or Polygon, the map is fitted to the bounding box of all
+   * coordinate pairs.
+   * @param {GeoJSONStoreGeometries} geometry GeoJSON geometry object.
+   */
+  const fitMapToGeometry = (geometry) => {
+    if (geometry.type === 'Point') {
+      const [longitude, latitude] = geometry.coordinates;
+
+      if (typeof longitude === 'number' && typeof latitude === 'number') {
+        map?.setView([latitude, longitude], 15);
+      }
+    } else {
+      const bounds = getGeometryBounds(geometry);
+
+      if (bounds) {
+        map?.fitBounds(bounds);
+      }
     }
   };
 
@@ -169,16 +198,14 @@
 
     // Validate the value
     try {
-      if (newValue !== undefined) {
-        geometry = JSON.parse(newValue);
+      geometry = JSON.parse(newValue);
 
-        if (
-          !isObject(geometry) ||
-          geometry.type !== geometryType ||
-          !Array.isArray(geometry.coordinates)
-        ) {
-          throw new Error('Invalid object');
-        }
+      if (
+        !isObject(geometry) ||
+        geometry.type !== geometryType ||
+        !Array.isArray(geometry.coordinates)
+      ) {
+        throw new Error('Invalid object');
       }
     } catch {
       newValue = '';
@@ -195,12 +222,7 @@
 
     if (geometry) {
       draw.addFeatures([{ type: 'Feature', geometry, properties: { mode: drawMode } }]);
-
-      if (geometry.coordinates.every((c) => typeof c === 'number')) {
-        const [longitude, latitude] = geometry.coordinates;
-
-        map?.setView([latitude, longitude], 15);
-      }
+      fitMapToGeometry(geometry);
     }
   };
 
@@ -290,7 +312,7 @@
   const useCurrentLocation = () => {
     if (!navigator.geolocation) {
       showAlertDialog = true;
-      errorMessage = $_('geolocation_unsupported');
+      errorMessage = _('geolocation_unsupported');
 
       return;
     }
@@ -301,7 +323,7 @@
       },
       (error) => {
         showAlertDialog = true;
-        errorMessage = $_('geolocation_error_body');
+        errorMessage = _('geolocation_error_body');
         // eslint-disable-next-line no-console
         console.error('Error getting current location:', error);
       },
@@ -344,13 +366,13 @@
 
 <div role="none" class="toolbar">
   <!-- @todo Replace this with `<Combobox>` -->
-  <SearchBar bind:value={searchQuery} debounce {readonly} flex placeholder={$_('find_place')} />
+  <SearchBar bind:value={searchQuery} debounce {readonly} flex placeholder={_('find_place')} />
   <!-- @todo Replace `title` with a native tooltip -->
   <Button
     variant="tertiary"
     iconic
-    title={$_('use_your_location')}
-    aria-label={$_('use_your_location')}
+    title={_('use_your_location')}
+    aria-label={_('use_your_location')}
     disabled={readonly}
     onclick={() => {
       useCurrentLocation();
@@ -362,7 +384,7 @@
   </Button>
   <Button
     variant="tertiary"
-    label={$_('clear')}
+    label={_('clear')}
     disabled={readonly || !currentValue}
     onclick={() => {
       clearValue();
@@ -371,11 +393,11 @@
 </div>
 
 {#if searching}
-  <div role="alert" class="search-result searching">{$_('searching')}</div>
+  <div role="alert" class="search-result searching">{_('searching')}</div>
 {:else if searchQuery}
   {#if searchResults}
     {#if searchResults.length}
-      <Listbox aria-label={$_('search_results')}>
+      <Listbox aria-label={_('search_results')}>
         {#each searchResults as result (result.place_id)}
           <Option
             label={result.display_name}
@@ -386,7 +408,7 @@
         {/each}
       </Listbox>
     {:else}
-      <div role="alert" class="search-result no-result">{$_('no_results')}</div>
+      <div role="alert" class="search-result no-result">{_('no_results')}</div>
     {/if}
   {/if}
 {/if}
@@ -395,7 +417,7 @@
   <LeafletMap bind:mapElement inert={readonly} class={invalid ? 'invalid' : undefined} {onReady} />
 </div>
 
-<AlertDialog bind:open={showAlertDialog} title={$_('geolocation_error_title')}>
+<AlertDialog bind:open={showAlertDialog} title={_('geolocation_error_title')}>
   {errorMessage}
 </AlertDialog>
 

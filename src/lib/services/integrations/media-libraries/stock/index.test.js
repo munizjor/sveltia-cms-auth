@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getStockAssetMediaLibraryOptions } from './index';
+import { getStockAssetMediaLibraryOptions } from '.';
 
 // Mock all dependencies
 vi.mock('$lib/services/integrations/media-libraries', () => ({
@@ -105,6 +105,25 @@ describe('integrations/media-libraries/stock', () => {
 
       expect(result).toEqual({
         providers: ['pexels', 'picsum', 'pixabay', 'unsplash'],
+      });
+    });
+
+    it('should return empty providers when stock_assets is explicitly disabled', async () => {
+      const { getMediaLibraryOptions } = await import('$lib/services/integrations/media-libraries');
+      const getMock = vi.mocked(getMediaLibraryOptions);
+
+      getMock.mockReturnValue(/** @type {any} */ (false));
+
+      const fieldConfig = /** @type {any} */ ({
+        media_libraries: {
+          stock_assets: false,
+        },
+      });
+
+      const result = getStockAssetMediaLibraryOptions({ fieldConfig });
+
+      expect(result).toEqual({
+        providers: [],
       });
     });
   });

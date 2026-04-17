@@ -212,15 +212,20 @@
  * Unified media storage option that supports multiple storage providers. See the
  * [documentation](https://sveltiacms.app/en/docs/media#configuration) for details.
  * @typedef {object} MediaLibraries
- * @property {DefaultMediaLibrary} [default] Options for the default media storage.
- * @property {CloudinaryMediaLibrary} [cloudinary] Options for the Cloudinary media storage.
- * @property {UploadcareMediaLibrary} [uploadcare] Options for the Uploadcare media storage.
- * @property {S3MediaLibrary} [aws_s3] Options for the Amazon S3 media storage.
- * @property {S3MediaLibrary} [cloudflare_r2] Options for the Cloudflare R2 media storage.
- * @property {S3MediaLibrary} [digitalocean_spaces] Options for the DigitalOcean Spaces media
- * storage.
- * @property {StockMediaLibrary} [stock_assets] Options for the unified stock photo/video media
- * library.
+ * @property {DefaultMediaLibrary | false} [default] Options for the default media storage. Set to
+ * `false` to explicitly disable the default (internal) storage.
+ * @property {CloudinaryMediaLibrary | false} [cloudinary] Options for the Cloudinary media storage.
+ * Set to `false` to explicitly disable.
+ * @property {UploadcareMediaLibrary | false} [uploadcare] Options for the Uploadcare media storage.
+ * Set to `false` to explicitly disable.
+ * @property {S3MediaLibrary | false} [aws_s3] Options for the Amazon S3 media storage. Set to
+ * `false` to explicitly disable.
+ * @property {S3MediaLibrary | false} [cloudflare_r2] Options for the Cloudflare R2 media storage.
+ * Set to `false` to explicitly disable.
+ * @property {S3MediaLibrary | false} [digitalocean_spaces] Options for the DigitalOcean Spaces
+ * media storage. Set to `false` to explicitly disable.
+ * @property {StockMediaLibrary | false} [stock_assets] Options for the unified stock photo/video
+ * media library. Set to `false` to explicitly disable.
  */
 
 /**
@@ -665,6 +670,9 @@
  * properties.
  * @property {number} [decimals] Precision of coordinates to be saved. Default: `7`.
  * @property {'Point' | 'LineString' | 'Polygon'} [type] Geometry type. Default: `Point`.
+ * @property {[number, number]} [center] Default center coordinates as `[longitude, latitude]`.
+ * Default: `[0, 0]`.
+ * @property {number} [zoom] Default zoom level. Default: `2`.
  * @see https://decapcms.org/docs/widgets/#Map
  * @see https://sveltiacms.app/en/docs/fields/map
  */
@@ -1392,6 +1400,9 @@
  * prefix will be added to commit messages. Default: `undefined`. See the
  * [documentation](https://sveltiacms.app/en/docs/deployments#disabling-automatic-deployments) for
  * details.
+ * @property {boolean} [allow_token_auth] Whether to allow users to authenticate using an access
+ * token. Default: `true`. If set to `false`, the “Sign In Using Access Token” button will be
+ * disabled in the UI, and users will be forced to use OAuth authentication.
  * @see https://decapcms.org/docs/backends-overview/
  * @see https://sveltiacms.app/en/docs/backends
  */
@@ -1532,6 +1543,10 @@
  * @property {boolean} [trim] Whether to trim leading and trailing replacement characters. Default:
  * `true`.
  * @property {boolean} [lowercase] Whether to convert the slug to lowercase. Default: `true`.
+ * @property {'utc' | 'local'} [timezone] Timezone to be used for date-based slug template tags,
+ * such as `{{day}}` and `{{hour}}`. Default is `utc` for backward compatibility with Netlify/Decap
+ * CMS. Use `local` to generate slugs based on the local time of the user’s browser, which is more
+ * intuitive in most cases.
  * @see https://decapcms.org/docs/configuration-options/#slug-type
  * @see https://sveltiacms.app/en/docs/collections/entries#global-slug-options
  */

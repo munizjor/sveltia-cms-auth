@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * @import { ConfigParserCollectors } from '$lib/types/private';
  */
 
-// Mock svelte-i18n
+// Mock @sveltia/i18n
 /** @type {Record<string, string>} */
 const mockI18nStrings = {
   'config.error.missing_backend': 'Missing backend configuration',
@@ -18,6 +18,8 @@ const mockI18nStrings = {
   'config.error.oauth_implicit_flow': 'OAuth implicit flow is not supported',
   'config.error.github_pkce_unsupported': 'GitHub does not support PKCE authentication',
   'config.error.oauth_no_app_id': 'OAuth app ID is required',
+  'config.warning.oauth_no_app_id':
+    'OAuth application ID is not defined. Users are required to provide an access token to sign in.',
 };
 
 /**
@@ -38,21 +40,9 @@ function mockTranslate(key, options) {
   return message;
 }
 
-vi.mock('svelte-i18n', () => ({
-  _: {
-    subscribe: vi.fn((fn) => {
-      fn(mockTranslate);
-
-      return () => {};
-    }),
-  },
-  locale: {
-    subscribe: vi.fn((fn) => {
-      fn('en-US');
-
-      return () => {};
-    }),
-  },
+vi.mock('@sveltia/i18n', () => ({
+  _: mockTranslate,
+  locale: { current: 'en-US', set: vi.fn() },
 }));
 
 const mockGetStore = vi.fn();
@@ -110,20 +100,7 @@ describe('parseBackendConfig', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mockGetStore.mockImplementation((store) => {
-      // Handle the i18n store
-      if (store && typeof store.subscribe === 'function') {
-        let result;
-
-        store.subscribe((/** @type {any} */ value) => {
-          result = value;
-        })();
-
-        return result;
-      }
-
-      return store;
-    });
+    mockGetStore.mockImplementation((store) => store);
 
     mockIsObject.mockImplementation(
       /**
@@ -316,7 +293,7 @@ describe('parseBackendConfig', () => {
       expect(collectors.errors.size).toBe(0);
     });
 
-    it('should require app_id for Gitea backend (checked in OAuth section)', async () => {
+    it('should warn when Gitea backend has no app_id and auth_type is not set', async () => {
       const { parseBackendConfig } = await import('./backend.js');
       const collectors = createCollectors();
 
@@ -330,7 +307,13 @@ describe('parseBackendConfig', () => {
 
       parseBackendConfig(config, collectors);
 
-      expect(collectors.errors.size).toBe(1);
+      // Token auth is allowed by default; a warning is issued and the Sign In button is disabled
+      expect(collectors.errors.size).toBe(0);
+      expect(collectors.warnings.size).toBe(1);
+
+      const [warning] = [...collectors.warnings];
+
+      expect(warning).toContain('OAuth application ID is not defined');
     });
 
     it('should error when repository is undefined for GitHub', async () => {
@@ -441,7 +424,7 @@ describe('parseBackendConfig', () => {
       expect(error).toBe('OAuth implicit flow is not supported');
     });
 
-    it('should require app_id for Gitea backend', async () => {
+    it('should warn when Gitea backend has no app_id and auth_type is not set', async () => {
       const { parseBackendConfig } = await import('./backend.js');
       const collectors = createCollectors();
 
@@ -455,7 +438,56 @@ describe('parseBackendConfig', () => {
 
       parseBackendConfig(config, collectors);
 
+      // Token auth is allowed by default; a warning is issued and the Sign In button is disabled
+      expect(collectors.errors.size).toBe(0);
+      expect(collectors.warnings.size).toBe(1);
+
+      const [warning] = [...collectors.warnings];
+
+      expect(warning).toContain('OAuth application ID is not defined');
+    });
+
+    it('should warn when Gitea backend has no app_id with PKCE auth_type (token auth allowed)', async () => {
+      const { parseBackendConfig } = await import('./backend.js');
+      const collectors = createCollectors();
+
+      /** @type {any} */
+      const config = {
+        backend: {
+          name: 'gitea',
+          repo: 'owner/repo',
+          auth_type: 'pkce',
+        },
+      };
+
+      parseBackendConfig(config, collectors);
+
+      // Token auth is still allowed; warning issued, not an error
+      expect(collectors.errors.size).toBe(0);
+      expect(collectors.warnings.size).toBe(1);
+
+      const [warning] = [...collectors.warnings];
+
+      expect(warning).toContain('OAuth application ID is not defined');
+    });
+
+    it('should error when Gitea backend has no app_id and allow_token_auth is false', async () => {
+      const { parseBackendConfig } = await import('./backend.js');
+      const collectors = createCollectors();
+
+      /** @type {any} */
+      const config = {
+        backend: {
+          name: 'gitea',
+          repo: 'owner/repo',
+          allow_token_auth: false,
+        },
+      };
+
+      parseBackendConfig(config, collectors);
+
       expect(collectors.errors.size).toBe(1);
+      expect(collectors.warnings.size).toBe(0);
 
       const [error] = [...collectors.errors];
 
@@ -540,12 +572,12 @@ describe('parseBackendConfig', () => {
 
       parseBackendConfig(config, collectors);
 
-      expect(collectors.errors.size).toBe(2);
+      // Only the GitHub PKCE error; oauth_no_app_id is skipped because name === 'github'
+      expect(collectors.errors.size).toBe(1);
 
-      const errors = [...collectors.errors];
+      const [error] = [...collectors.errors];
 
-      expect(errors.some((e) => e === 'GitHub does not support PKCE authentication')).toBe(true);
-      expect(errors.some((e) => e === 'OAuth app ID is required')).toBe(true);
+      expect(error).toBe('GitHub does not support PKCE authentication');
     });
   });
 

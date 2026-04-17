@@ -56,7 +56,7 @@ vi.mock('svelte/store', () => ({
   })),
 }));
 
-vi.mock('svelte-i18n', () => ({
+vi.mock('@sveltia/i18n', () => ({
   _: mockGetLocaleText,
 }));
 
@@ -105,9 +105,7 @@ describe('auth service', () => {
       }
 
       // Handle the translation function (_)
-      if (store === mockGetLocaleText) {
-        return mockGetLocaleText;
-      }
+      // (no longer needed; _ is called directly in @sveltia/i18n)
 
       // Default to returning the cmsConfig for other store access
       return mockCmsConfig;
@@ -506,7 +504,7 @@ describe('auth service', () => {
       mockGet.mockImplementation((store) => {
         if (store === mockBackendName) return 'local';
 
-        return mockGetLocaleText;
+        return mockCmsConfig;
       });
       mockGetLocaleText.mockReturnValue('Picker dismissed error');
 
@@ -525,7 +523,7 @@ describe('auth service', () => {
       mockGet.mockImplementation((store) => {
         if (store === mockBackendName) return 'github';
 
-        return mockGetLocaleText;
+        return mockCmsConfig;
       });
       mockGetLocaleText.mockReturnValue('Authentication aborted error');
 
@@ -950,6 +948,31 @@ describe('auth service', () => {
       expect(authModule.unauthenticated.set).toHaveBeenCalledWith(true);
     });
 
+    it('should not clear cache on non-auth fetch files failure', async () => {
+      const cachedUser = { token: 'test-token', backendName: 'github' };
+
+      mockLocalStorage.get.mockResolvedValue(cachedUser);
+      mockGet.mockImplementation((store) => {
+        if (store === mockBackendStore) return mockBackend;
+        if (store === mockCmsConfigStore) return mockCmsConfig;
+        if (store === mockGetLocaleText) return mockGetLocaleText;
+
+        return mockCmsConfig;
+      });
+      mockBackend.signIn.mockResolvedValue(cachedUser);
+
+      const fetchError = new Error('Failed to retrieve the last commit hash.');
+
+      fetchError.cause = new Error('Branch not found');
+      mockBackend.fetchFiles.mockRejectedValue(fetchError);
+
+      await authModule.signInAutomatically();
+
+      expect(authModule.signInError.set).toHaveBeenCalled();
+      // Should NOT clear the cached token for non-auth errors like missing branches
+      expect(mockLocalStorage.set).not.toHaveBeenCalledWith('sveltia-cms.user', {});
+    });
+
     it('should handle case when getBackend returns undefined', async () => {
       const cachedUser = { token: 'test-token', backendName: 'github' };
 
@@ -1098,7 +1121,7 @@ describe('auth service', () => {
       expect(authModule.signingIn.set).not.toHaveBeenCalled();
     });
 
-    it('should handle fetch files failure', async () => {
+    it('should handle fetch files failure with auth error', async () => {
       const user = { token: 'manual-token' };
 
       mockGet.mockImplementation((store) => {
@@ -1109,7 +1132,7 @@ describe('auth service', () => {
       });
       mockBackend.signIn.mockResolvedValue(user);
 
-      const fetchError = new Error('Fetch failed');
+      const fetchError = new Error('Not a collaborator of the repository');
 
       mockBackend.fetchFiles.mockRejectedValue(fetchError);
 
@@ -1122,6 +1145,31 @@ describe('auth service', () => {
       expect(mockLocalStorage.set).toHaveBeenCalledWith('sveltia-cms.user', {});
       expect(mockUser.set).toHaveBeenCalledWith(undefined);
       expect(authModule.unauthenticated.set).toHaveBeenCalledWith(true);
+    });
+
+    it('should not clear cache on non-auth fetch files failure', async () => {
+      const user = { token: 'manual-token' };
+
+      mockGet.mockImplementation((store) => {
+        if (store === mockBackendStore) return mockBackend;
+        if (store === mockGetLocaleText) return mockGetLocaleText;
+
+        return mockCmsConfig;
+      });
+      mockBackend.signIn.mockResolvedValue(user);
+
+      const fetchError = new Error('Failed to retrieve the last commit hash.');
+
+      fetchError.cause = new Error('Branch not found');
+      mockBackend.fetchFiles.mockRejectedValue(fetchError);
+
+      await authModule.signInManually('github', 'manual-token');
+
+      expect(authModule.signingIn.set).toHaveBeenCalledWith(true);
+      expect(authModule.signingIn.set).toHaveBeenCalledWith(false);
+      expect(authModule.signInError.set).toHaveBeenCalled();
+      // Should NOT clear the cached token for non-auth errors like missing branches
+      expect(mockLocalStorage.set).not.toHaveBeenCalledWith('sveltia-cms.user', {});
     });
   });
 

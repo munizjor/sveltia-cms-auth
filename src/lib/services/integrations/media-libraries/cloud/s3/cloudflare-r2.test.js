@@ -65,7 +65,7 @@ describe('integrations/media-libraries/cloud/s3/cloudflare-r2', () => {
         'https://dash.cloudflare.com/?to=/:account/r2/api-tokens',
       );
       expect(cloudflareR2Service.apiKeyPattern).toBeInstanceOf(RegExp);
-      // eslint-disable-next-line import/no-named-as-default-member
+      // eslint-disable-next-line import-x/no-named-as-default-member
       expect(cloudflareR2Service.isEnabled).toBeDefined();
     });
 
@@ -107,6 +107,40 @@ describe('integrations/media-libraries/cloud/s3/cloudflare-r2', () => {
       });
 
       expect(isEnabled()).toBe(false);
+    });
+
+    it('should return true when field-level config is present', () => {
+      vi.mocked(get).mockReturnValue({});
+
+      expect(
+        isEnabled(
+          /** @type {any} */ ({
+            widget: 'file',
+            media_libraries: {
+              cloudflare_r2: {
+                access_key_id: mockAccessKeyId,
+                bucket: mockBucket,
+                account_id: mockAccountId,
+              },
+            },
+          }),
+        ),
+      ).toBe(true);
+    });
+
+    it('should return false when field-level config has missing credentials', () => {
+      vi.mocked(get).mockReturnValue({});
+
+      expect(
+        isEnabled(
+          /** @type {any} */ ({
+            widget: 'file',
+            media_libraries: {
+              cloudflare_r2: {},
+            },
+          }),
+        ),
+      ).toBe(false);
     });
   });
 

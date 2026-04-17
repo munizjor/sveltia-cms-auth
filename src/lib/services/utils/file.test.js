@@ -36,19 +36,9 @@ vi.mock('svelte/store', () => ({
 }));
 
 // Mock i18n dependencies
-vi.mock('svelte-i18n', () => ({
-  /**
-   * Locale store.
-   * @returns {string} Current locale.
-   */
-  locale: () => 'en',
-  /**
-   * Translation function store.
-   * @returns {import('vitest').Mock} Translation function.
-   */
-  _: () => vi.fn((key, options) => `${key}(${options?.values?.size || ''})`),
-  addMessages: vi.fn(),
-  init: vi.fn(),
+vi.mock('@sveltia/i18n', () => ({
+  locale: { current: 'en', set: vi.fn() },
+  _: vi.fn((key, options) => `${key}(${options?.values?.size || ''})`),
 }));
 
 describe('Test encodeFilePath()', () => {
@@ -121,6 +111,14 @@ describe('Test formatFileName()', () => {
     // Test numbers and hyphens are preserved
     expect(formatFileName('file-123.txt', options)).toEqual('file-123.txt');
     expect(formatFileName('2023-report.xlsx', options)).toEqual('2023-report.xlsx');
+
+    // Test uppercase extensions are lowercased during slugification
+    expect(formatFileName('Photo.JPG', options)).toEqual('photo.jpg');
+    expect(formatFileName('Video.MOV', options)).toEqual('video.mov');
+    expect(formatFileName('Clip.MP4', options)).toEqual('clip.mp4');
+    expect(formatFileName('Document.PDF', options)).toEqual('document.pdf');
+    expect(formatFileName('My Image.JPEG', options)).toEqual('my-image.jpeg');
+    expect(formatFileName('Mixed Case.Png', options)).toEqual('mixed-case.png');
   });
 
   test('Handling duplicate names', () => {

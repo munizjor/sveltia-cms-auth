@@ -1,4 +1,5 @@
 <script>
+  import { _ } from '@sveltia/i18n';
   import {
     Button,
     Dialog,
@@ -15,7 +16,6 @@
   import { getHash } from '@sveltia/utils/crypto';
   import { getPathInfo } from '@sveltia/utils/file';
   import equal from 'fast-deep-equal';
-  import { _ } from 'svelte-i18n';
 
   import CloudinaryPanel from '$lib/components/assets/browser/cloudinary-panel.svelte';
   import ExternalAssetsPanel from '$lib/components/assets/browser/external-assets-panel.svelte';
@@ -27,7 +27,7 @@
     convertFileItemToAsset,
     getUnsavedAssets,
   } from '$lib/services/contents/fields/file/process';
-  import { allCloudStorageServices } from '$lib/services/integrations/media-libraries/cloud';
+  import { getMediaLibraryOptions } from '$lib/services/integrations/media-libraries';
   import {
     allStockAssetProviders,
     getStockAssetMediaLibraryOptions,
@@ -46,6 +46,7 @@
    * AssetLibraryFolderMapKey,
    * EntryDraft,
    * MediaLibraryAssetKind,
+   * MediaLibraryService,
    * SelectAssetsView,
    * SelectedResource,
    * } from '$lib/types/private';
@@ -62,6 +63,11 @@
    * @property {Writable<EntryDraft | null | undefined>} [entryDraft] Associated entry draft.
    * @property {MediaField} [fieldConfig] Field configuration.
    * @property {AssetLibraryFolderMap} assetLibraryFolderMap Default asset library folder map.
+   * @property {[string, MediaLibraryService][]} enabledCloudServiceEntries List of enabled cloud
+   * storage services.
+   * @property {File[]} [pendingFiles] Files to be uploaded to the cloud service panel when the
+   * dialog opens. These are typically files dropped on the file editor when only a cloud service is
+   * available.
    * @property {(resources: SelectedResource[]) => void} [onSelect] Custom `Select` event handler
    * that will be called when the dialog is closed with the Insert button.
    */
@@ -78,7 +84,9 @@
     entryDraft,
     fieldConfig,
     assetLibraryFolderMap,
+    enabledCloudServiceEntries,
     onSelect = undefined,
+    pendingFiles = $bindable([]),
     /* eslint-enable prefer-const */
   } = $props();
 
@@ -112,11 +120,12 @@
   };
 
   const title = $derived(
-    kind === 'image' ? $_('assets_dialog.title.image') : $_('assets_dialog.title.file'),
+    kind === 'image' ? _('assets_dialog.title.image') : _('assets_dialog.title.file'),
   );
   const searchTerms = $derived(normalize(rawSearchTerms));
   const isDefaultLibraryEnabled = $derived(
-    Object.values(assetLibraryFolderMap).some(({ enabled }) => enabled),
+    getMediaLibraryOptions({ fieldConfig }) !== false &&
+      Object.values(assetLibraryFolderMap).some(({ enabled }) => enabled),
   );
   const isDefaultLibrary = $derived(libraryName.startsWith('default-'));
   const selectedFolder = $derived.by(() => {
@@ -177,9 +186,6 @@
       ([serviceId, { authType }]) =>
         serviceId === libraryName && (authType === 'none' || !!$prefs?.apiKeys?.[libraryName]),
     ),
-  );
-  const enabledCloudServiceEntries = $derived(
-    Object.entries(allCloudStorageServices).filter(([, { isEnabled }]) => isEnabled?.() ?? true),
   );
   const enabledExternalServiceEntries = $derived(
     [...enabledCloudServiceEntries, ...enabledStockAssetProviderEntries].sort(sortServicesByName),
@@ -309,9 +315,9 @@
   };
 
   $effect.pre(() => {
-    const firstDefaultLibraryId = Object.entries(assetLibraryFolderMap).find(
-      ([, { enabled }]) => enabled,
-    )?.[0];
+    const firstDefaultLibraryId = isDefaultLibraryEnabled
+      ? Object.entries(assetLibraryFolderMap).find(([, { enabled }]) => enabled)?.[0]
+      : undefined;
 
     if (firstDefaultLibraryId) {
       // Select the first enabled folder
@@ -342,6 +348,14 @@
       open = false;
     }
   });
+
+  // Upload pending files (e.g. dropped on the file editor) to the cloud service panel once mounted
+  $effect(() => {
+    if (externalAssetsPanel && pendingFiles.length) {
+      externalAssetsPanel.uploadFiles(pendingFiles);
+      pendingFiles = [];
+    }
+  });
 </script>
 
 {#snippet headerItems()}
@@ -357,13 +371,13 @@
       bind:value={rawSearchTerms}
       debounce={!isDefaultLibrary}
       disabled={selectedResources.some((r) => r.file)}
-      aria-label={$_(`assets_dialog.search_for_${kind ?? 'file'}`)}
+      aria-label={_(`assets_dialog.search_for_${kind ?? 'file'}`)}
     />
   {/if}
   {#if isDefaultLibrary || (isCloudLibrary && libraryName !== 'cloudinary')}
     <Button
       variant="primary"
-      label={$_('upload')}
+      label={_('upload')}
       onclick={() => {
         filePicker?.open();
       }}
@@ -378,7 +392,7 @@
 <Dialog
   {title}
   size="x-large"
-  okLabel={$_('insert')}
+  okLabel={_('insert')}
   okDisabled={!selectedResources.length}
   keepContent={true}
   focusInput={false}
@@ -399,7 +413,7 @@
         allStockAssetProviders[/** @type {StockAssetProviderName} */ (libraryName)] ?? {}}
       {#if showServiceLink}
         <a href={serviceURL}>
-          {$_('prefs.media.stock_photos.credit', { values: { service: serviceLabel } })}
+          {_('prefs.media.stock_photos.credit', { values: { service: serviceLabel } })}
         </a>
       {/if}
     {/if}
@@ -408,7 +422,7 @@
     <div role="none" class="nav">
       <Selector
         class="tabs"
-        aria-label={$_('assets_dialog.locations')}
+        aria-label={_('assets_dialog.locations')}
         aria-controls="{elementIdPrefix}-content-pane"
         filterThreshold={-1}
         onChange={(event) => {
@@ -417,13 +431,13 @@
         }}
       >
         {#if isDefaultLibraryEnabled}
-          <OptionGroup label={$_('asset_location.repository')}>
+          <OptionGroup label={_('asset_location.repository')}>
             {#each Object.entries(assetLibraryFolderMap) as [id, { enabled }] (id)}
               {#if enabled}
                 {@const name = `default-${id}`}
                 <Option
                   {name}
-                  label={$_(`assets_dialog.folder.${id}`)}
+                  label={_(`assets_dialog.folder.${id}`)}
                   selected={libraryName === name}
                 />
               {/if}
@@ -431,21 +445,21 @@
           </OptionGroup>
         {/if}
         {#if canEnterURL || !!Object.keys(enabledCloudServiceEntries).length}
-          <OptionGroup label={$_('asset_location.external')}>
+          <OptionGroup label={_('asset_location.external')}>
             {#each enabledCloudServiceEntries as [, { serviceId, serviceLabel }] (serviceId)}
               <Option name={serviceId} label={serviceLabel} selected={libraryName === serviceId} />
             {/each}
             {#if canEnterURL}
               <Option
                 name="enter-url"
-                label={$_('assets_dialog.enter_url')}
+                label={_('assets_dialog.enter_url')}
                 selected={libraryName === 'enter-url'}
               />
             {/if}
           </OptionGroup>
         {/if}
         {#if enabledStockAssetProviderEntries.length}
-          <OptionGroup label={$_('asset_location.stock_photos')}>
+          <OptionGroup label={_('asset_location.stock_photos')}>
             {#each enabledStockAssetProviderEntries as [serviceId, { serviceLabel }] (serviceId)}
               <Option name={serviceId} label={serviceLabel} selected={libraryName === serviceId} />
             {/each}
@@ -476,8 +490,8 @@
         <EmptyState>
           <div role="none">
             {kind === 'image'
-              ? $_('assets_dialog.enter_image_url')
-              : $_('assets_dialog.enter_file_url')}
+              ? _('assets_dialog.enter_image_url')
+              : _('assets_dialog.enter_file_url')}
           </div>
           <TextInput
             bind:value={enteredURL}

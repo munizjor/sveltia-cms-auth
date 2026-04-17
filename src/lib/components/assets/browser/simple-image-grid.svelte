@@ -1,6 +1,6 @@
 <script>
+  import { _ } from '@sveltia/i18n';
   import { Listbox } from '@sveltia/ui';
-  import { _ } from 'svelte-i18n';
 
   /**
    * @import { Snippet } from 'svelte';
@@ -35,7 +35,7 @@
     id={gridId}
     class={viewType}
     {multiple}
-    aria-label={$_('assets_dialog.available_images')}
+    aria-label={_('assets_dialog.available_images')}
     onChange={(event) => {
       onChange?.(event.detail);
     }}
@@ -51,8 +51,6 @@
     :global {
       .listbox {
         gap: 4px;
-        overflow-x: hidden;
-        overflow-y: auto;
         border-width: 0;
         max-height: calc(100% - var(--sui-focus-ring-width) * 2);
 

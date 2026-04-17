@@ -29,12 +29,14 @@ words:
   - camelcase
   - Cloudinary
   - cmaps
+  - Codeberg
   - cooldown
   - CVEs
   - danurbanowicz
   - Decap
   - DeepL
   - deepmerge
+  - DeepSeek
   - dialogs
   - dompurify
   - embeddable
@@ -63,6 +65,7 @@ words:
   - jSquash
   - keymap
   - keyvalue
+  - Kohei
   - kyoshino
   - lvml
   - mdwn
@@ -111,6 +114,7 @@ words:
   - smol
   - strikethrough
   - stylelint
+  - subfolders
   - sveltejs
   - Sveltia
   - templatized
@@ -123,6 +127,7 @@ words:
   - unlocalized
   - unpatched
   - unproxify
+  - unrs
   - unsubscribers
   - Uploadcare
   - videoseries
@@ -135,6 +140,7 @@ words:
   - worktree
   - xslx
   - yacosta
+  - Yoshino
   - zanhk
   - Zola
 overrides:

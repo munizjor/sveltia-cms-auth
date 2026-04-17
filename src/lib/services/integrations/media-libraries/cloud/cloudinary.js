@@ -79,7 +79,8 @@ export const CONFIG_PROPS = [
  * Get Cloudinary library options from site config.
  * @internal
  * @param {CmsConfig | MediaField} [config] CMS configuration or field configuration.
- * @returns {CloudinaryMediaLibrary | undefined} Configuration object.
+ * @returns {CloudinaryMediaLibrary | false | undefined} Configuration object, or `false` if
+ * explicitly disabled.
  */
 export const getLibraryOptions = (config) => {
   const _cmsConfig = get(cmsConfig);
@@ -87,7 +88,7 @@ export const getLibraryOptions = (config) => {
   config ??= _cmsConfig;
 
   // Check for explicit media_libraries.cloudinary config (preferred)
-  if (config?.media_libraries?.cloudinary) {
+  if (config?.media_libraries && 'cloudinary' in config.media_libraries) {
     return config.media_libraries.cloudinary;
   }
 
@@ -127,8 +128,8 @@ export const getMergedLibraryOptions = (fieldConfig) => {
     return cache;
   }
 
-  const siteOptions = getLibraryOptions() ?? { config: {} };
-  const fieldOptions = getLibraryOptions(fieldConfig) ?? { config: {} };
+  const siteOptions = getLibraryOptions() || { config: {} };
+  const fieldOptions = getLibraryOptions(fieldConfig) || { config: {} };
 
   const options = {
     ...siteOptions,
@@ -150,17 +151,20 @@ export const getMergedLibraryOptions = (fieldConfig) => {
  * @returns {{ cloudName?: string; apiKey?: string }} Cloudinary configuration.
  */
 export const getCloudConfig = () => {
-  const { cloud_name: cloudName, api_key: apiKey } = getLibraryOptions()?.config ?? {};
+  const options = getLibraryOptions();
+  const { cloud_name: cloudName, api_key: apiKey } = (options ? options.config : undefined) ?? {};
 
   return { cloudName, apiKey };
 };
 
 /**
  * Check if Cloudinary integration is enabled.
+ * @param {MediaField} [fieldConfig] Field configuration.
  * @returns {boolean} True if enabled, false otherwise.
  */
-export const isEnabled = () => {
-  const { cloudName, apiKey } = getCloudConfig();
+export const isEnabled = (fieldConfig) => {
+  const options = getLibraryOptions(fieldConfig) ?? getLibraryOptions();
+  const { cloud_name: cloudName, api_key: apiKey } = (options ? options.config : undefined) ?? {};
 
   return !!(cloudName && apiKey);
 };
@@ -263,7 +267,7 @@ export const parseResults = (results, { fieldConfig } = {}) => {
     output_filename_only: fileNameOnly = false,
     use_transformations: useTransformations = true,
     config: { default_transformations: defaultTransformations = [] } = {},
-  } = getLibraryOptions(fieldConfig) ?? getLibraryOptions() ?? {};
+  } = (getLibraryOptions(fieldConfig) ?? getLibraryOptions()) || {};
 
   const transformation = /** @type {Record<string, any>[][]} */ (defaultTransformations)?.[0]?.[0];
   const hasTransformation = useTransformations && isObject(transformation);
